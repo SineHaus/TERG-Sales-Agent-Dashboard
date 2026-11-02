@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}{{ lead.fields.client_name or lead.customer_email }}{% endblock %}
+{% block head %}
+<style>
+.head{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.head .grow{flex:1;min-width:240px}
+.grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:20px;align-items:start}
+.thread{display:flex;flex-direction:column;gap:12px}
+.msg{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--panel);max-width:92%}
+.msg.out{align-self:flex-end;background:var(--accent-soft);border-color:transparent}
+.msg .meta{font-size:12px;color:var(--muted);margin-bottom:6px;display:flex;justify-content:space-between;gap:12px}
+.msg .text{white-space:pre-wrap;word-wrap:break-word}
+.draft{border:1.5px dashed var(--accent);border-radius:12px;padding:14px;background:var(--panel)}
+.draft textarea{min-height:220px;background:var(--panel)}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.fgroup{margin-bottom:18px}
+.fgroup h3{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 8px}
+.f{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center;margin-bottom:6px}
+.f label{font-size:13px;color:var(--muted)}
+.f.req label::after{content:" *";color:var(--warn)}
+.f.empty input{border-color:var(--warn);background:var(--warn-soft)}
+.sheet{white-space:pre-wrap;font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:12px;max-height:340px;overflow:auto}
+.side{display:flex;flex-direction:column;gap:20px}
+.warn{background:var(--warn-soft);color:var(--warn);border-radius:8px;padding:10px 12px;font-size:14px}
+.sim{margin-top:8px}
+details summary{cursor:pointer;color:var(--muted);font-size:14px}
+@media (max-width:980px){.grid{grid-template-columns:1fr}.f{grid-template-columns:1fr;gap:2px}}
+</style>
+{% endblock %}
+{% block body %}
+<div class="head">
+  <div class="grow">
+    <div class="muted" style="font-size:13px"><a href="{{ url_for('index') }}">← All inquiries</a>{% if is_test %} · Test lead (not from Gmail){% endif %}</div>
+    <h1>{{ lead.fields.client_name or lead.customer_name or lead.customer_email }}</h1>
+    <div class="muted">{{ lead.customer_email }} · {{ lead.subject }}</div>
+    {% if lead.summary %}<p style="margin:8px 0 0">{{ lead.summary }}</p>{% endif %}
+  </div>
+  <form method="post" action="{{ url_for('set_status', lead_id=lead.id) }}" style="display:flex;gap:8px;align-items:center">
+    <span class="pill s-{{ lead.status }}">{{ STATUSES[lead.status] }}</span>
+    <select name="status" onchange="this.form.submit()" style="width:auto">
+      {% for k, v in STATUSES.items() %}<option value="{{ k }}" {{ 'selected' if k==lead.status }}>{{ v }}</option>{% endfor %}
+    </select>
+  </form>
+</div>
+
+<div class="grid">
+  <section>
+    <h2>Conversation</h2>
+    <div class="thread">
+      {% for m in messages %}
+        <div class="msg {{ 'out' if m.direction=='outbound' }}">
+          <div class="meta"><span>{{ 'You' if m.direction=='outbound' else m.sender }}</span><span>{{ m.sent_at|when }}</span></div>
+          <div class="text">{{ m.body }}</div>
+        </div>
+      {% endfor %}
+
+      {% if lead.draft_body is not none and lead.status != 'ignored' %}
+      <form class="draft" method="post" action="{{ url_for('save_draft', lead_id=lead.id) }}">
+        <div class="meta muted" style="font-size:12px;margin-bottom:8px">
+          Draft reply by the agent{% if not is_test %}, also saved in your Gmail Drafts{% endif %}. Edit it as needed.
+        </div>
+        <textarea name="draft_body">{{ lead.draft_body }}</textarea>
+        <div class="row">
+          <button class="btn primary" name="action" value="send"
+            onclick="return confirm('Send this reply to {{ lead.customer_email }}?')">{{ 'Record as sent' if is_test else 'Send reply' }}</button>
+          <button class="btn" name="action" value="save">Save edits</button>
+        </div>
+      </form>
+      {% endif %}
+
+      {% if is_test %}
+      <details class="sim" {{ 'open' if lead.draft_body is none }}>
+        <summary>Simulate the customer's next email</summary>
+        <form method="post" action="{{ url_for('simulate_reply', lead_id=lead.id) }}" style="margin-top:8px">
+          <textarea name="body" rows="5" required placeholder="Write what the customer replies…"></textarea>
+          <div class="row"><button class="btn">Add reply &amp; run agent</button></div>
+        </form>
+      </details>
+      {% endif %}
+    </div>
+
+    <form method="post" action="{{ url_for('regenerate', lead_id=lead.id) }}" class="panel" style="margin-top:20px">
+      <h2>Steer the agent</h2>
+      <p class="muted" style="margin:-6px 0 10px;font-size:14px">Private notes the agent reads before drafting, e.g. "We're booked June 13, offer the 14th" or "Don't ask about lighting".</p>
+      <textarea name="owner_notes" rows="3">{{ lead.owner_notes or '' }}</textarea>
+      <div class="row"><button class="btn">Rewrite draft with these notes</button></div>
+    </form>
+  </section>
+
+  <aside class="side">
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <h2 style="margin:0">For Goodshuffle Pro</h2>
+        <button class="btn small" type="button" onclick="copySheet(this)">Copy all</button>
+      </div>
+      {% if lead.missing %}
+        <div class="warn" style="margin-bottom:10px">Still missing: {{ missing_labels|join(', ') }}</div>
+      {% else %}
+        <div class="flash" style="margin-bottom:10px">Everything required is collected. Ready to build the quote.</div>
+      {% endif %}
+      <div class="sheet" id="sheet">{{ sheet }}</div>
+    </div>
+
+    <form class="panel" method="post" action="{{ url_for('save_fields', lead_id=lead.id) }}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h2 style="margin:0">Client &amp; event info</h2>
+        <button class="btn small primary">Save</button>
+      </div>
+      {% for group, items in groups %}
+        <div class="fgroup">
+          <h3>{{ group }}</h3>
+          {% for key, label, req in items %}
+            {% set val = lead.fields.get(key) or '' %}
+            <div class="f {{ 'req' if req }} {{ 'empty' if req and not val }}">
+              <label for="f-{{ key }}">{{ label.split(' (')[0] }}</label>
+              <input id="f-{{ key }}" name="{{ key }}" value="{{ val }}" title="{{ label }}">
+            </div>
+          {% endfor %}
+        </div>
+      {% endfor %}
+      <input type="hidden" name="owner_notes" value="{{ lead.owner_notes or '' }}">
+      <button class="btn primary">Save</button>
+    </form>
+  </aside>
+</div>
+<script>
+function copySheet(b){
+  navigator.clipboard.writeText(document.getElementById('sheet').innerText).then(()=>{
+    const t=b.textContent; b.textContent='Copied'; setTimeout(()=>b.textContent=t,1200);
+  });
+}
+</script>
+{% endblock %}

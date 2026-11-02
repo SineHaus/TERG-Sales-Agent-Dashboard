@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Inquiries{% endblock %} · {{ business }}</title>
+<style>
+:root{
+  --bg:#f6f5f2; --panel:#fff; --ink:#1d1f1e; --muted:#6b6f6c; --line:#e4e2dc;
+  --accent:#2f6b4f; --accent-ink:#fff; --accent-soft:#e6f0ea;
+  --warn:#9a5b00; --warn-soft:#fbf0dc; --danger:#a33a2a; --danger-soft:#f9e5e1;
+  --blue:#2b5c8a; --blue-soft:#e3edf7; --gray-soft:#eeedea;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#141615; --panel:#1c1f1e; --ink:#e9ebe9; --muted:#9aa09c; --line:#2d3230;
+  --accent:#5fb48a; --accent-ink:#0e1a14; --accent-soft:#1f3329;
+  --warn:#e2a64a; --warn-soft:#3a2d17; --danger:#e57b69; --danger-soft:#3a201b;
+  --blue:#7fb0e0; --blue-soft:#1b2a3a; --gray-soft:#262a28;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif}
+a{color:inherit}
+header.top{display:flex;align-items:center;gap:16px;padding:14px 24px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+header.top .brand{font-weight:650;text-decoration:none}
+header.top nav{display:flex;gap:4px;margin-left:8px}
+header.top nav a{text-decoration:none;color:var(--muted);padding:6px 10px;border-radius:8px}
+header.top nav a.on,header.top nav a:hover{color:var(--ink);background:var(--gray-soft)}
+header.top .right{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px;background:var(--danger)}
+.dot.ok{background:var(--accent)}
+main{max-width:1280px;margin:0 auto;padding:24px}
+h1{font-size:22px;margin:0 0 4px}
+h2{font-size:15px;margin:0 0 12px;letter-spacing:.01em}
+.muted{color:var(--muted)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:7px 14px;border-radius:8px;font:inherit;font-size:14px;cursor:pointer;text-decoration:none}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn.small{padding:4px 10px;font-size:13px}
+input,textarea,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 10px;width:100%}
+textarea{resize:vertical}
+input:focus,textarea:focus,select:focus{outline:2px solid var(--accent);outline-offset:-1px}
+.pill{display:inline-block;font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.s-new,.s-collecting{background:var(--blue-soft);color:var(--blue)}
+.s-ready_to_quote{background:var(--accent-soft);color:var(--accent)}
+.s-needs_you{background:var(--warn-soft);color:var(--warn)}
+.s-quoted{background:var(--gray-soft);color:var(--ink)}
+.s-won{background:var(--accent);color:var(--accent-ink)}
+.s-lost,.s-ignored{background:var(--gray-soft);color:var(--muted)}
+.flash{background:var(--accent-soft);color:var(--accent);padding:10px 14px;border-radius:8px;margin-bottom:16px}
+@media (max-width:720px){header.top{flex-wrap:wrap;padding:12px 16px}main{padding:16px}header.top .right{width:100%;margin-left:0}}
+</style>
+{% block head %}{% endblock %}
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="{{ url_for('index') }}">{{ business }} · Inquiries</a>
+  <nav>
+    <a href="{{ url_for('index') }}" class="{{ 'on' if request.endpoint=='index' }}">Leads</a>
+    <a href="{{ url_for('try_it') }}" class="{{ 'on' if request.endpoint=='try_it' }}">Try it</a>
+  </nav>
+  <div class="right">
+    {% if gmail_connected %}<span><span class="dot ok"></span>Gmail connected</span>
+      <form method="post" action="{{ url_for('poll_now') }}"><button class="btn small">Check now</button></form>
+    {% else %}<span title="Run: python connect_gmail.py"><span class="dot"></span>Gmail not connected</span>{% endif %}
+  </div>
+</header>
+<main>
+  {% for m in get_flashed_messages() %}<div class="flash">{{ m }}</div>{% endfor %}
+  {% block body %}{% endblock %}
+</main>
+</body>
+</html>

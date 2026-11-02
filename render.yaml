@@ -1,0 +1,35 @@
+# Render Blueprint: in Render, choose New → Blueprint and pick this repository.
+services:
+  - type: web
+    name: rental-sales-agent
+    runtime: python
+    plan: starter            # always on; the free plan sleeps and would stop checking Gmail
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn wsgi:app --workers 1 --threads 4 --timeout 120 --bind 0.0.0.0:$PORT
+    healthCheckPath: /healthz
+    disk:
+      name: data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: DATA_DIR
+        value: /var/data
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: SECRET_KEY
+        generateValue: true
+      # Filled in by you in the Render dashboard when you create the Blueprint:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: DASHBOARD_PASSWORD
+        sync: false
+      - key: GMAIL_TOKEN_JSON
+        sync: false
+      - key: BUSINESS_NAME
+        sync: false
+      - key: OWNER_NAME
+        sync: false
+      - key: SERVICE_AREA
+        sync: false
+      - key: BUSINESS_NOTES
+        sync: false
