@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Gmail{% endblock %}
+{% block head %}
+<style>
+.wrap{max-width:760px;display:grid;gap:18px}
+ol{padding-left:20px;margin:8px 0} ol li{margin:8px 0}
+code.copy{display:inline-block;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:2px 8px;font-size:13px;cursor:pointer;word-break:break-all}
+.ok{background:var(--accent-soft);color:var(--accent);border-radius:8px;padding:12px 14px}
+label{display:grid;gap:4px;font-size:14px}
+</style>
+{% endblock %}
+{% block body %}
+<div class="wrap">
+  <div>
+    <h1>Gmail</h1>
+    <p class="muted" style="margin:0">The agent reads your inbox for inquiries and saves its replies as drafts. It never sends anything on its own.</p>
+  </div>
+
+  {% if account %}
+  <div class="panel">
+    <div class="ok">Connected as <b>{{ account }}</b>. The agent checks for new inquiries every few minutes.</div>
+    <form method="post" action="{{ url_for('gmail_disconnect') }}" style="margin-top:12px"
+          onsubmit="return confirm('Disconnect Gmail? The agent will stop checking email.')">
+      <button class="btn small">Disconnect</button>
+    </form>
+  </div>
+  {% elif has_client %}
+  <div class="panel">
+    <h2>Last step: sign in to Google</h2>
+    <p>Sign in with the Gmail account that receives your inquiries. If Google says the app isn't verified, click <b>Advanced → Go to (app name)</b>. It's your own app.</p>
+    <form method="post" action="{{ url_for('gmail_connect') }}"><button class="btn primary">Connect Gmail</button></form>
+  </div>
+  {% endif %}
+
+  {% if not has_client or not account %}
+  <div class="panel">
+    <h2>{{ 'Step 1: ' if not has_client }}Create a Google sign-in key (one time, about 10 minutes)</h2>
+    <p class="muted" style="margin-top:-6px">Google requires every app that reads Gmail to have one. Click a grey box to copy it.</p>
+    <ol>
+      <li>Go to <a href="https://console.cloud.google.com/projectcreate" target="_blank">console.cloud.google.com/projectcreate</a>, name it <code class="copy">Sales Agent</code> and click <b>Create</b>.</li>
+      <li>Open <a href="https://console.cloud.google.com/apis/library/gmail.googleapis.com" target="_blank">the Gmail API page</a> (make sure your new project is selected at the top) and click <b>Enable</b>.</li>
+      <li>Open <a href="https://console.cloud.google.com/auth/overview" target="_blank">Google Auth Platform</a> and click <b>Get started</b>. App name <code class="copy">Sales Agent</code>, your email as support email, <b>External</b> audience (or <b>Internal</b> if you use Google Workspace), your email as contact. Finish.</li>
+      <li>Still there, open <b>Audience</b> and click <b>Publish app</b> (skip if you chose Internal). Otherwise Google signs the agent out every 7 days.</li>
+      <li>Open <b>Clients → Create client</b>. Type <b>Web application</b>.<br>
+          Authorized JavaScript origins: <code class="copy">{{ origin }}</code><br>
+          Authorized redirect URIs: <code class="copy">{{ redirect_uri }}</code><br>
+          Click <b>Create</b>. Copy the Client ID and Client secret it shows into the boxes below.</li>
+    </ol>
+    <form method="post" style="display:grid;gap:10px;margin-top:12px">
+      <label>Client ID<input name="client_id" required placeholder="1234…apps.googleusercontent.com"></label>
+      <label>Client secret<input name="client_secret" required type="password" placeholder="GOCSPX-…"></label>
+      <div><button class="btn primary">Save</button></div>
+    </form>
+  </div>
+  {% endif %}
+</div>
+<script>
+document.querySelectorAll('code.copy').forEach(c=>c.addEventListener('click',()=>{
+  navigator.clipboard.writeText(c.innerText); const t=c.innerText; c.innerText='Copied'; setTimeout(()=>c.innerText=t,900);
+}));
+</script>
+{% endblock %}

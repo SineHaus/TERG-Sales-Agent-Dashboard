@@ -29,6 +29,12 @@ GMAIL_TOKEN = os.getenv("GMAIL_TOKEN", str(DATA_DIR / "token.json"))
 _token_json = os.getenv("GMAIL_TOKEN_JSON", "").strip()
 if _token_json and not Path(GMAIL_TOKEN).exists():
     Path(GMAIL_TOKEN).write_text(_token_json)
+# Google OAuth client for the "Connect Gmail" button. Set these, or paste them on the
+# dashboard's Gmail setup page (saved to DATA_DIR/google_client.json).
+GOOGLE_CLIENT_FILE = DATA_DIR / "google_client.json"
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
+
 # Which emails count as possible inquiries. Gmail search syntax.
 GMAIL_QUERY = os.getenv("GMAIL_QUERY", "in:inbox newer_than:3d -category:promotions -category:social -category:updates")
 POLL_SECONDS = int(os.getenv("POLL_SECONDS", "120"))

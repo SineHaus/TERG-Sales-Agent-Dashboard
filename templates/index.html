@@ -71,6 +71,6 @@ td .sub{font-size:13px;color:var(--muted)}
   </tbody>
 </table>
 {% else %}
-<div class="panel empty">No inquiries here yet.{% if not gmail_connected %} Connect Gmail, or use <a href="{{ url_for('try_it') }}">Try it</a> to test the agent with a sample email.{% endif %}</div>
+<div class="panel empty">No inquiries here yet.{% if not gmail_connected %} <a href="{{ url_for('gmail_setup') }}">Connect Gmail</a>, or use <a href="{{ url_for('try_it') }}">Try it</a> to test the agent with a sample email.{% endif %}</div>
 {% endif %}
 {% endblock %}

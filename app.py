@@ -1,11 +1,14 @@
 """Dashboard: every inquiry, its conversation, the collected info, and the draft reply."""
 import functools
 import hmac
+import json
 import logging
+import os
 import uuid
 from pathlib import Path
 
 from flask import Flask, abort, flash, redirect, render_template, request, session, url_for
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 import agent
 import config
@@ -14,6 +17,8 @@ import worker
 from fields import FIELD_GROUPS, LABELS, missing_required
 
 app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)  # so links use https behind Render's proxy
+os.environ.setdefault("OAUTHLIB_RELAX_TOKEN_SCOPE", "1")
 app.secret_key = config.SECRET_KEY
 if config.ON_SERVER:
     if not config.DASHBOARD_PASSWORD:
@@ -55,6 +60,31 @@ def gmail_for(lead):
 def globals_():
     return dict(STATUSES=db.STATUSES, LABELS=LABELS, gmail_connected=gmail_ready(),
                 business=config.BUSINESS_NAME)
+
+
+# ---------- Connect Gmail from the browser ----------
+def google_client():
+    """(client_id, client_secret) from env vars or the setup page, or None."""
+    if config.GOOGLE_CLIENT_ID and config.GOOGLE_CLIENT_SECRET:
+        return config.GOOGLE_CLIENT_ID, config.GOOGLE_CLIENT_SECRET
+    if config.GOOGLE_CLIENT_FILE.exists():
+        d = json.loads(config.GOOGLE_CLIENT_FILE.read_text())
+        return d["client_id"], d["client_secret"]
+    return None
+
+
+def _flow(state=None):
+    from google_auth_oauthlib.flow import Flow
+    from gmail_client import SCOPES
+    cid, secret = google_client()
+    redirect_uri = url_for("gmail_callback", _external=True)
+    if redirect_uri.startswith("http://localhost") or redirect_uri.startswith("http://127.0.0.1"):
+        os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"  # allowed for local testing only
+    cfg = {"web": {"client_id": cid, "client_secret": secret,
+                   "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                   "token_uri": "https://oauth2.googleapis.com/token",
+                   "redirect_uris": [redirect_uri]}}
+    return Flow.from_client_config(cfg, scopes=SCOPES, state=state, redirect_uri=redirect_uri)
 
 
 def login_required(view):
@@ -208,6 +238,76 @@ def simulate_reply(lead_id):
                    request.form["body"].strip())
     worker.draft_reply(OfflineGmail(), lead_id)
     return redirect(url_for("lead_view", lead_id=lead_id))
+
+
+@app.route("/gmail", methods=["GET", "POST"])
+@login_required
+def gmail_setup():
+    if request.method == "POST":
+        cid = request.form.get("client_id", "").strip()
+        secret = request.form.get("client_secret", "").strip()
+        if cid and secret:
+            config.GOOGLE_CLIENT_FILE.write_text(json.dumps({"client_id": cid, "client_secret": secret}))
+            os.chmod(config.GOOGLE_CLIENT_FILE, 0o600)
+            flash("Saved. Now click Connect Gmail.")
+        return redirect(url_for("gmail_setup"))
+    account = None
+    if gmail_ready():
+        try:
+            account = get_gmail().me
+        except Exception as e:  # token revoked or expired
+            account = f"connection problem: {e}"
+    return render_template("gmail.html", has_client=google_client() is not None,
+                           redirect_uri=url_for("gmail_callback", _external=True),
+                           origin=request.host_url.rstrip("/"), account=account)
+
+
+@app.post("/gmail/connect")
+@login_required
+def gmail_connect():
+    if not google_client():
+        return redirect(url_for("gmail_setup"))
+    flow = _flow()
+    auth_url, state = flow.authorization_url(access_type="offline", prompt="consent")
+    session["oauth_state"] = state
+    session["oauth_verifier"] = getattr(flow, "code_verifier", None)
+    return redirect(auth_url)
+
+
+@app.get("/gmail/callback")
+@login_required
+def gmail_callback():
+    global _gmail
+    if request.args.get("error"):
+        flash(f"Google sign-in was cancelled ({request.args['error']}).")
+        return redirect(url_for("gmail_setup"))
+    state = session.pop("oauth_state", None)
+    if not state or state != request.args.get("state"):
+        abort(400)
+    flow = _flow(state)
+    if session.get("oauth_verifier"):
+        flow.code_verifier = session.pop("oauth_verifier")
+    flow.fetch_token(authorization_response=request.url)
+    if not flow.credentials.refresh_token:
+        flash("Google didn't return a long-lived sign-in. Remove the app's access at "
+              "myaccount.google.com/permissions and connect again.")
+        return redirect(url_for("gmail_setup"))
+    Path(config.GMAIL_TOKEN).write_text(flow.credentials.to_json())
+    os.chmod(config.GMAIL_TOKEN, 0o600)
+    _gmail = None
+    worker.start_background(get_gmail)
+    flash(f"Gmail connected as {get_gmail().me}. New inquiries will appear here within a few minutes.")
+    return redirect(url_for("index"))
+
+
+@app.post("/gmail/disconnect")
+@login_required
+def gmail_disconnect():
+    global _gmail
+    Path(config.GMAIL_TOKEN).unlink(missing_ok=True)
+    _gmail = None
+    flash("Gmail disconnected.")
+    return redirect(url_for("gmail_setup"))
 
 
 @app.post("/poll")

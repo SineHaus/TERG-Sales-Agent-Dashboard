@@ -12,8 +12,6 @@ from app import app, get_gmail, gmail_ready
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 db.init()
-if gmail_ready():
-    worker.start_background(get_gmail)
-    logging.info("Gmail watcher started")
-else:
-    logging.warning("Gmail not connected: set GMAIL_TOKEN_JSON (see README).")
+worker.start_background(get_gmail)
+if not gmail_ready():
+    logging.warning("Gmail not connected yet: open the dashboard and click Connect Gmail.")

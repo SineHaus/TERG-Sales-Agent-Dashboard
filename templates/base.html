@@ -60,9 +60,9 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--accent);outline-
     <a href="{{ url_for('try_it') }}" class="{{ 'on' if request.endpoint=='try_it' }}">Try it</a>
   </nav>
   <div class="right">
-    {% if gmail_connected %}<span><span class="dot ok"></span>Gmail connected</span>
+    {% if gmail_connected %}<a href="{{ url_for('gmail_setup') }}" style="text-decoration:none"><span class="dot ok"></span>Gmail connected</a>
       <form method="post" action="{{ url_for('poll_now') }}"><button class="btn small">Check now</button></form>
-    {% else %}<span title="Run: python connect_gmail.py"><span class="dot"></span>Gmail not connected</span>{% endif %}
+    {% else %}<a class="btn small primary" href="{{ url_for('gmail_setup') }}">Connect Gmail</a>{% endif %}
   </div>
 </header>
 <main>

@@ -2,6 +2,7 @@
 import logging
 import threading
 import time
+from pathlib import Path
 
 import agent
 import config
@@ -101,11 +102,23 @@ def poll_once(gmail):
             log.exception("Failed on thread %s", tid)
 
 
+_started = False
+
+
 def start_background(gmail_factory):
-    """Run the poller in a daemon thread next to the dashboard."""
+    """Run the poller in a daemon thread next to the dashboard. It idles until Gmail is connected."""
+    global _started
+    if _started:
+        return
+    _started = True
+
     def loop():
         gmail = None
         while True:
+            if not Path(config.GMAIL_TOKEN).exists():
+                gmail = None
+                time.sleep(15)
+                continue
             try:
                 gmail = gmail or gmail_factory()
                 poll_once(gmail)

@@ -13,10 +13,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname
 
 if __name__ == "__main__":
     db.init()
-    if gmail_ready():
-        worker.start_background(get_gmail)
-        print(f"Watching Gmail every {config.POLL_SECONDS}s.")
-    else:
-        print("Gmail not connected yet (run: python connect_gmail.py). Dashboard and Try-It page still work.")
+    worker.start_background(get_gmail)
+    if not gmail_ready():
+        print("Gmail not connected yet: open the dashboard and click Connect Gmail.")
     print(f"Dashboard: http://localhost:{config.PORT}")
     app.run(host="127.0.0.1", port=config.PORT, debug=False)
